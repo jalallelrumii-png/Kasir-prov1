@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="description" content="Aplikasi Kasir Pintar - POS Modern & Offline">
+    <title>Kasir Pintar - Smart POS</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Vue.js 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.3s;
+        }
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+        
+        .slide-enter-active, .slide-leave-active {
+            transition: transform 0.3s;
+        }
+        .slide-enter-from {
+            transform: translateX(100%);
+        }
+        .slide-leave-to {
+            transform: translateX(-100%);
+        }
+        
+        .print-area {
+            display: none;
+        }
+        
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .print-area, .print-area * {
+                visibility: visible;
+            }
+            .print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app" class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg">
+            <div class="container mx-auto px-4 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <i class="fas fa-cash-register text-3xl"></i>
+                        <div>
+                            <h1 class="text-2xl font-bold">Kasir Pintar</h1>
+                            <p class="text-xs text-indigo-200">Smart POS System</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="text-right hidden md:block">
+                            <p class="text-sm font-semibold">{{ currentDate }}</p>
+                            <p class="text-xs text-indigo-200">{{ currentTime }}</p>
+                        </div>
+                        <button @click="showSettings = !showSettings" 
+                                class="bg-white/20 hover:bg-white/30 p-2 rounded-lg transition">
+                            <i class="fas fa-cog text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="container mx-auto px-4 py-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Left Panel - Products -->
+                <div class="lg:col-span-2">
+                    <!-- Search & Categories -->
+                    <div class="bg-white rounded-xl shadow-md p-4 mb-4">
+                        <div class="flex flex-col md:flex-row gap-3">
+                            <div class="flex-1 relative">
+                                <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                                <input 
+                                    v-model="searchQuery"
+                                    type="text" 
+                                    placeholder="Cari produk..."
+                                    class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+                            </div>
+                            <select v-model="selectedCategory" 
+                                    class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="">Semua Kategori</option>
+                                <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Products Grid -->
+                    <div class="bg-white rounded-xl shadow-md p-4">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-lg font-bold text-gray-800">Produk</h2>
+                            <button @click="showAddProduct = true"
+                                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
+                                <i class="fas fa-plus mr-2"></i>Tambah Produk
+                            </button>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[600px] overflow-y-auto">
+                            <div v-for="product in filteredProducts" 
+                                 :key="product.id"
+                                 @click="addToCart(product)"
+                                 class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg p-3 cursor-pointer hover:shadow-lg transition transform hover:-translate-y-1 border-2 border-transparent hover:border-indigo-300">
+                                <div class="text-center">
+                                    <div class="bg-white rounded-lg p-3 mb-2">
+                                        <i :class="product.icon" class="text-4xl text-indigo-600"></i>
+                                    </div>
+                                    <h3 class="font-semibold text-sm text-gray-800 mb-1">{{ product.name }}</h3>
+                                    <p class="text-xs text-gray-500 mb-2">{{ product.category }}</p>
+                                    <p class="text-lg font-bold text-indigo-600">Rp {{ formatPrice(product.price) }}</p>
+                                    <p class="text-xs text-gray-500 mt-1">Stok: {{ product.stock }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div v-if="filteredProducts.length === 0" class="text-center py-12">
+                            <i class="fas fa-box-open text-6xl text-gray-300 mb-4"></i>
+                            <p class="text-gray-500">Tidak ada produk ditemukan</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Panel - Cart & Checkout -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white rounded-xl shadow-md p-4 sticky top-4">
+                        <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fas fa-shopping-cart mr-2 text-indigo-600"></i>
+                            Keranjang Belanja
+                        </h2>
+
+                        <!-- Cart Items -->
+                        <div class="space-y-3 max-h-[300px] overflow-y-auto mb-4">
+                            <transition-group name="fade">
+                                <div v-for="item in cart" 
+                                     :key="item.id"
+                                     class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <div class="flex-1">
+                                            <h4 class="font-semibold text-sm text-gray-800">{{ item.name }}</h4>
+                                            <p class="text-xs text-gray-500">Rp {{ formatPrice(item.price) }}</p>
+                                        </div>
+                                        <button @click="removeFromCart(item.id)"
+                                                class="text-red-500 hover:text-red-700">
+                                            <i class="fas fa-trash text-sm"></i>
+                                        </button>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-2">
+                                            <button @click="decreaseQty(item.id)"
+                                                    class="bg-gray-200 hover:bg-gray-300 w-7 h-7 rounded flex items-center justify-center">
+                                                <i class="fas fa-minus text-xs"></i>
+                                            </button>
+                                            <input 
+                                                v-model.number="item.qty"
+                                                @change="updateQty(item)"
+                                                type="number"
+                                                min="1"
+                                                class="w-12 text-center border border-gray-300 rounded py-1 text-sm">
+                                            <button @click="increaseQty(item.id)"
+                                                    class="bg-gray-200 hover:bg-gray-300 w-7 h-7 rounded flex items-center justify-center">
+                                                <i class="fas fa-plus text-xs"></i>
+                                            </button>
+                                        </div>
+                                        <p class="font-bold text-indigo-600">Rp {{ formatPrice(item.price * item.qty) }}</p>
+                                    </div>
+                                </div>
+                            </transition-group>
+                        </div>
+
+                        <div v-if="cart.length === 0" class="text-center py-8">
+                            <i class="fas fa-shopping-basket text-5xl text-gray-300 mb-3"></i>
+                            <p class="text-gray-500 text-sm">Keranjang masih kosong</p>
+                        </div>
+
+                        <!-- Summary -->
+                        <div v-if="cart.length > 0" class="border-t border-gray-200 pt-4 space-y-3">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Subtotal</span>
+                                <span class="font-semibold">Rp {{ formatPrice(subtotal) }}</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Pajak ({{ taxRate }}%)</span>
+                                <span class="font-semibold">Rp {{ formatPrice(tax) }}</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Diskon</span>
+                                <input 
+                                    v-model.number="discount"
+                                    type="number"
+                                    min="0"
+                                    :max="subtotal"
+                                    class="w-24 text-right border border-gray-300 rounded px-2 py-1 text-sm font-semibold">
+                            </div>
+                            <div class="flex justify-between items-center pt-3 border-t border-gray-200">
+                                <span class="text-lg font-bold text-gray-800">Total</span>
+                                <span class="text-2xl font-bold text-indigo-600">Rp {{ formatPrice(total) }}</span>
+                            </div>
+
+                            <!-- Payment Input -->
+                            <div class="pt-3">
+                                <label class="text-sm text-gray-600 mb-1 block">Pembayaran</label>
+                                <input 
+                                    v-model.number="payment"
+                                    type="number"
+                                    min="0"
+                                    placeholder="Masukkan nominal..."
+                                    class="w-full border border-gray-300 rounded-lg px-4 py-2 text-lg font-semibold focus:ring-2 focus:ring-indigo-500 outline-none">
+                                
+                                <div v-if="payment > 0" class="mt-2 p-3 bg-indigo-50 rounded-lg">
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-gray-600">Kembalian</span>
+                                        <span class="text-lg font-bold" :class="change >= 0 ? 'text-green-600' : 'text-red-600'">
+                                            Rp {{ formatPrice(Math.abs(change)) }}
+                                        </span>
+                                    </div>
+                                    <p v-if="change < 0" class="text-xs text-red-600 mt-1">Pembayaran kurang!</p>
+                                </div>
+                            </div>
+
+                            <!-- Quick Payment Buttons -->
+                            <div class="grid grid-cols-3 gap-2 mt-3">
+                                <button @click="payment = total"
+                                        class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-sm font-semibold transition">
+                                    Pas
+                                </button>
+                                <button @click="payment = Math.ceil(total / 50000) * 50000"
+                                        class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-sm font-semibold transition">
+                                    50K
+                                </button>
+                                <button @click="payment = Math.ceil(total / 100000) * 100000"
+                                        class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-sm font-semibold transition">
+                                    100K
+                                </button>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="space-y-2 pt-3">
+                                <button @click="processPayment"
+                                        :disabled="change < 0 || payment === 0"
+                                        :class="change >= 0 && payment > 0 ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'"
+                                        class="w-full text-white px-4 py-3 rounded-lg font-bold transition">
+                                    <i class="fas fa-check-circle mr-2"></i>Bayar
+                                </button>
+                                <button @click="clearCart"
+                                        class="w-full bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-lg font-bold transition">
+                                    <i class="fas fa-times-circle mr-2"></i>Batal
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transaction History Button -->
+                    <button @click="showHistory = true"
+                            class="w-full mt-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-3 rounded-lg font-semibold shadow-md transition">
+                        <i class="fas fa-history mr-2"></i>Riwayat Transaksi
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Product Modal -->
+        <transition name="fade">
+            <div v-if="showAddProduct" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-gray-800">Tambah Produk</h3>
+                        <button @click="showAddProduct = false" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    <form @submit.prevent="addProduct" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Nama Produk</label>
+                            <input v-model="newProduct.name" type="text" required
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Kategori</label>
+                            <select v-model="newProduct.category" required
+                                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Harga</label>
+                            <input v-model.number="newProduct.price" type="number" required min="0"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Stok</label>
+                            <input v-model.number="newProduct.stock" type="number" required min="0"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Icon (Font Awesome class)</label>
+                            <input v-model="newProduct.icon" type="text" placeholder="fas fa-box"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <button type="submit" 
+                                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-lg font-bold transition">
+                            <i class="fas fa-plus mr-2"></i>Tambah Produk
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </transition>
+
+        <!-- Transaction History Modal -->
+        <transition name="fade">
+            <div v-if="showHistory" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-2xl font-bold">Riwayat Transaksi</h3>
+                            <button @click="showHistory = false" class="text-white hover:text-gray-200">
+                                <i class="fas fa-times text-2xl"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
+                        <div v-if="transactions.length === 0" class="text-center py-12">
+                            <i class="fas fa-receipt text-6xl text-gray-300 mb-4"></i>
+                            <p class="text-gray-500">Belum ada transaksi</p>
+                        </div>
+                        
+                        <div v-else class="space-y-4">
+                            <div v-for="(transaction, index) in transactions.slice().reverse()" 
+                                 :key="transaction.id"
+                                 class="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div>
+                                        <p class="font-bold text-gray-800">Transaksi #{{ transaction.id }}</p>
+                                        <p class="text-sm text-gray-500">{{ transaction.date }}</p>
+                                    </div>
+                                    <button @click="printReceipt(transaction)"
+                                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-sm">
+                                        <i class="fas fa-print mr-1"></i>Cetak
+                                    </button>
+                                </div>
+                                <div class="border-t border-gray-200 pt-3 space-y-2">
+                                    <div v-for="item in transaction.items" :key="item.id" class="flex justify-between text-sm">
+                                        <span class="text-gray-600">{{ item.name }} ({{ item.qty }}x)</span>
+                                        <span class="font-semibold">Rp {{ formatPrice(item.price * item.qty) }}</span>
+                                    </div>
+                                </div>
+                                <div class="border-t border-gray-200 mt-3 pt-3">
+                                    <div class="flex justify-between text-sm mb-1">
+                                        <span class="text-gray-600">Subtotal</span>
+                                        <span>Rp {{ formatPrice(transaction.subtotal) }}</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm mb-1">
+                                        <span class="text-gray-600">Pajak</span>
+                                        <span>Rp {{ formatPrice(transaction.tax) }}</span>
+                                    </div>
+                                    <div v-if="transaction.discount > 0" class="flex justify-between text-sm mb-1">
+                                        <span class="text-gray-600">Diskon</span>
+                                        <span class="text-red-600">- Rp {{ formatPrice(transaction.discount) }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center pt-2 border-t border-gray-300">
+                                        <span class="font-bold text-gray-800">Total</span>
+                                        <span class="text-xl font-bold text-indigo-600">Rp {{ formatPrice(transaction.total) }}</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm mt-2">
+                                        <span class="text-gray-600">Bayar</span>
+                                        <span>Rp {{ formatPrice(transaction.payment) }}</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-gray-600">Kembalian</span>
+                                        <span class="text-green-600 font-semibold">Rp {{ formatPrice(transaction.change) }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
+        <!-- Settings Modal -->
+        <transition name="fade">
+            <div v-if="showSettings" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-gray-800">Pengaturan</h3>
+                        <button @click="showSettings = false" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Pajak (%)</label>
+                            <input v-model.number="taxRate" type="number" min="0" max="100" step="0.1"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Nama Toko</label>
+                            <input v-model="storeName" type="text"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Alamat Toko</label>
+                            <textarea v-model="storeAddress" rows="2"
+                                      class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                        </div>
+                        <button @click="clearAllData"
+                                class="w-full bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-lg font-bold transition">
+                            <i class="fas fa-trash mr-2"></i>Hapus Semua Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
+        <!-- Success Toast -->
+        <transition name="fade">
+            <div v-if="showToast" class="fixed top-20 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 flex items-center space-x-3">
+                <i class="fas fa-check-circle text-2xl"></i>
+                <div>
+                    <p class="font-bold">Transaksi Berhasil!</p>
+                    <p class="text-sm">{{ toastMessage }}</p>
+                </div>
+            </div>
+        </transition>
+
+        <!-- Print Receipt Area -->
+        <div class="print-area">
+            <div v-if="currentReceipt" style="width: 80mm; padding: 10px; font-family: monospace;">
+                <div style="text-align: center; margin-bottom: 15px;">
+                    <h2 style="font-size: 18px; font-weight: bold; margin: 0;">{{ storeName }}</h2>
+                    <p style="font-size: 11px; margin: 5px 0;">{{ storeAddress }}</p>
+                    <p style="font-size: 11px; margin: 5px 0;">{{ currentReceipt.date }}</p>
+                    <p style="font-size: 11px; margin: 5px 0;">Trx: #{{ currentReceipt.id }}</p>
+                </div>
+                <div style="border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 10px 0;">
+                    <div v-for="item in currentReceipt.items" :key="item.id" style="margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                            <span>{{ item.name }}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; padding-left: 10px;">
+                            <span>{{ item.qty }} x Rp {{ formatPrice(item.price) }}</span>
+                            <span style="font-weight: bold;">Rp {{ formatPrice(item.price * item.qty) }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="padding: 10px 0; font-size: 11px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>Subtotal:</span>
+                        <span>Rp {{ formatPrice(currentReceipt.subtotal) }}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>Pajak ({{ taxRate }}%):</span>
+                        <span>Rp {{ formatPrice(currentReceipt.tax) }}</span>
+                    </div>
+                    <div v-if="currentReceipt.discount > 0" style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>Diskon:</span>
+                        <span>- Rp {{ formatPrice(currentReceipt.discount) }}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #000;">
+                        <span>TOTAL:</span>
+                        <span>Rp {{ formatPrice(currentReceipt.total) }}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 10px;">
+                        <span>Bayar:</span>
+                        <span>Rp {{ formatPrice(currentReceipt.payment) }}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Kembalian:</span>
+                        <span>Rp {{ formatPrice(currentReceipt.change) }}</span>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-top: 15px; padding-top: 10px; border-top: 1px dashed #000; font-size: 11px;">
+                    <p style="margin: 5px 0;">Terima Kasih</p>
+                    <p style="margin: 5px 0;">Atas Kunjungan Anda</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Install PWA Prompt -->
+        <div v-if="showInstallPrompt" class="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-white rounded-lg shadow-2xl p-4 z-50 border-2 border-indigo-500">
+            <button @click="showInstallPrompt = false" class="absolute top-2 right-2 text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="flex items-start space-x-3">
+                <i class="fas fa-download text-3xl text-indigo-600"></i>
+                <div>
+                    <h4 class="font-bold text-gray-800 mb-1">Install Aplikasi</h4>
+                    <p class="text-sm text-gray-600 mb-3">Install Kasir Pintar untuk akses lebih cepat dan bisa offline!</p>
+                    <button @click="installPWA" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
+                        <i class="fas fa-mobile-alt mr-2"></i>Install Sekarang
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    // Products
+                    products: [],
+                    categories: ['Makanan', 'Minuman', 'Elektronik', 'Fashion', 'Kesehatan', 'Lainnya'],
+                    searchQuery: '',
+                    selectedCategory: '',
+                    
+                    // Cart
+                    cart: [],
+                    discount: 0,
+                    payment: 0,
+                    
+                    // Settings
+                    taxRate: 10,
+                    storeName: 'Toko Kasir Pintar',
+                    storeAddress: 'Jl. Teknologi No. 123, Jakarta',
+                    
+                    // Transactions
+                    transactions: [],
+                    
+                    // UI State
+                    showAddProduct: false,
+                    showHistory: false,
+                    showSettings: false,
+                    showToast: false,
+                    toastMessage: '',
+                    currentReceipt: null,
+                    
+                    // Time
+                    currentDate: '',
+                    currentTime: '',
+                    
+                    // PWA
+                    deferredPrompt: null,
+                    showInstallPrompt: false,
+                    
+                    // New Product Form
+                    newProduct: {
+                        name: '',
+                        category: 'Makanan',
+                        price: 0,
+                        stock: 0,
+                        icon: 'fas fa-box'
+                    }
+                }
+            },
+            
+            computed: {
+                filteredProducts() {
+                    return this.products.filter(product => {
+                        const matchSearch = product.name.toLowerCase().includes(this.searchQuery.toLowerCase());
+                        const matchCategory = !this.selectedCategory || product.category === this.selectedCategory;
+                        return matchSearch && matchCategory;
+                    });
+                },
+                
+                subtotal() {
+                    return this.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+                },
+                
+                tax() {
+                    return Math.round(this.subtotal * (this.taxRate / 100));
+                },
+                
+                total() {
+                    return this.subtotal + this.tax - this.discount;
+                },
+                
+                change() {
+                    return this.payment - this.total;
+                }
+            },
+            
+            methods: {
+                formatPrice(price) {
+                    return new Intl.NumberFormat('id-ID').format(price);
+                },
+                
+                addToCart(product) {
+                    if (product.stock <= 0) {
+                        alert('Stok habis!');
+                        return;
+                    }
+                    
+                    const existingItem = this.cart.find(item => item.id === product.id);
+                    
+                    if (existingItem) {
+                        if (existingItem.qty < product.stock) {
+                            existingItem.qty++;
+                        } else {
+                            alert('Stok tidak mencukupi!');
+                        }
+                    } else {
+                        this.cart.push({
+                            id: product.id,
+                            name: product.name,
+                            price: product.price,
+                            qty: 1,
+                            maxStock: product.stock
+                        });
+                    }
+                },
+                
+                removeFromCart(itemId) {
+                    this.cart = this.cart.filter(item => item.id !== itemId);
+                },
+                
+                increaseQty(itemId) {
+                    const item = this.cart.find(i => i.id === itemId);
+                    if (item && item.qty < item.maxStock) {
+                        item.qty++;
+                    } else {
+                        alert('Stok tidak mencukupi!');
+                    }
+                },
+                
+                decreaseQty(itemId) {
+                    const item = this.cart.find(i => i.id === itemId);
+                    if (item && item.qty > 1) {
+                        item.qty--;
+                    }
+                },
+                
+                updateQty(item) {
+                    if (item.qty < 1) {
+                        item.qty = 1;
+                    }
+                    if (item.qty > item.maxStock) {
+                        item.qty = item.maxStock;
+                        alert('Stok tidak mencukupi!');
+                    }
+                },
+                
+                clearCart() {
+                    if (confirm('Yakin ingin membatalkan transaksi?')) {
+                        this.cart = [];
+                        this.discount = 0;
+                        this.payment = 0;
+                    }
+                },
+                
+                processPayment() {
+                    if (this.change < 0) {
+                        alert('Pembayaran kurang!');
+                        return;
+                    }
+                    
+                    // Update stock
+                    this.cart.forEach(cartItem => {
+                        const product = this.products.find(p => p.id === cartItem.id);
+                        if (product) {
+                            product.stock -= cartItem.qty;
+                        }
+                    });
+                    
+                    // Create transaction
+                    const transaction = {
+                        id: Date.now(),
+                        date: new Date().toLocaleString('id-ID'),
+                        items: [...this.cart],
+                        subtotal: this.subtotal,
+                        tax: this.tax,
+                        discount: this.discount,
+                        total: this.total,
+                        payment: this.payment,
+                        change: this.change
+                    };
+                    
+                    this.transactions.push(transaction);
+                    this.currentReceipt = transaction;
+                    
+                    // Save to localStorage
+                    this.saveData();
+                    
+                    // Show toast
+                    this.toastMessage = `Total: Rp ${this.formatPrice(this.total)}`;
+                    this.showToast = true;
+                    setTimeout(() => {
+                        this.showToast = false;
+                    }, 3000);
+                    
+                    // Print receipt
+                    setTimeout(() => {
+                        window.print();
+                    }, 500);
+                    
+                    // Clear cart
+                    this.cart = [];
+                    this.discount = 0;
+                    this.payment = 0;
+                },
+                
+                addProduct() {
+                    const product = {
+                        id: Date.now(),
+                        name: this.newProduct.name,
+                        category: this.newProduct.category,
+                        price: this.newProduct.price,
+                        stock: this.newProduct.stock,
+                        icon: this.newProduct.icon || 'fas fa-box'
+                    };
+                    
+                    this.products.push(product);
+                    this.saveData();
+                    
+                    // Reset form
+                    this.newProduct = {
+                        name: '',
+                        category: 'Makanan',
+                        price: 0,
+                        stock: 0,
+                        icon: 'fas fa-box'
+                    };
+                    
+                    this.showAddProduct = false;
+                },
+                
+                printReceipt(transaction) {
+                    this.currentReceipt = transaction;
+                    setTimeout(() => {
+                        window.print();
+                    }, 100);
+                },
+                
+                clearAllData() {
+                    if (confirm('Yakin ingin menghapus semua data? Tindakan ini tidak bisa dibatalkan!')) {
+                        this.products = [];
+                        this.transactions = [];
+                        this.cart = [];
+                        localStorage.clear();
+                        this.initializeDefaultProducts();
+                    }
+                },
+                
+                saveData() {
+                    localStorage.setItem('kasir_products', JSON.stringify(this.products));
+                    localStorage.setItem('kasir_transactions', JSON.stringify(this.transactions));
+                    localStorage.setItem('kasir_settings', JSON.stringify({
+                        taxRate: this.taxRate,
+                        storeName: this.storeName,
+                        storeAddress: this.storeAddress
+                    }));
+                },
+                
+                loadData() {
+                    const products = localStorage.getItem('kasir_products');
+                    const transactions = localStorage.getItem('kasir_transactions');
+                    const settings = localStorage.getItem('kasir_settings');
+                    
+                    if (products) {
+                        this.products = JSON.parse(products);
+                    } else {
+                        this.initializeDefaultProducts();
+                    }
+                    
+                    if (transactions) {
+                        this.transactions = JSON.parse(transactions);
+                    }
+                    
+                    if (settings) {
+                        const settingsData = JSON.parse(settings);
+                        this.taxRate = settingsData.taxRate;
+                        this.storeName = settingsData.storeName;
+                        this.storeAddress = settingsData.storeAddress;
+                    }
+                },
+                
+                initializeDefaultProducts() {
+                    this.products = [
+                        { id: 1, name: 'Nasi Goreng', category: 'Makanan', price: 15000, stock: 50, icon: 'fas fa-bowl-rice' },
+                        { id: 2, name: 'Mie Ayam', category: 'Makanan', price: 12000, stock: 45, icon: 'fas fa-bowl-food' },
+                        { id: 3, name: 'Sate Ayam', category: 'Makanan', price: 18000, stock: 30, icon: 'fas fa-drumstick-bite' },
+                        { id: 4, name: 'Es Teh Manis', category: 'Minuman', price: 5000, stock: 100, icon: 'fas fa-mug-hot' },
+                        { id: 5, name: 'Jus Jeruk', category: 'Minuman', price: 8000, stock: 80, icon: 'fas fa-glass-water' },
+                        { id: 6, name: 'Kopi Hitam', category: 'Minuman', price: 7000, stock: 90, icon: 'fas fa-coffee' },
+                        { id: 7, name: 'Roti Bakar', category: 'Makanan', price: 10000, stock: 40, icon: 'fas fa-bread-slice' },
+                        { id: 8, name: 'Pisang Goreng', category: 'Makanan', price: 8000, stock: 60, icon: 'fas fa-cookie-bite' }
+                    ];
+                    this.saveData();
+                },
+                
+                updateTime() {
+                    const now = new Date();
+                    this.currentDate = now.toLocaleDateString('id-ID', { 
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                    });
+                    this.currentTime = now.toLocaleTimeString('id-ID');
+                },
+                
+                installPWA() {
+                    if (this.deferredPrompt) {
+                        this.deferredPrompt.prompt();
+                        this.deferredPrompt.userChoice.then((choiceResult) => {
+                            this.deferredPrompt = null;
+                            this.showInstallPrompt = false;
+                        });
+                    }
+                }
+            },
+            
+            mounted() {
+                // Load data
+                this.loadData();
+                
+                // Update time
+                this.updateTime();
+                setInterval(this.updateTime, 1000);
+                
+                // PWA Install prompt
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    e.preventDefault();
+                    this.deferredPrompt = e;
+                    setTimeout(() => {
+                        this.showInstallPrompt = true;
+                    }, 3000);
+                });
+                
+                // Register Service Worker
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.register('/sw.js')
+                        .then(registration => console.log('SW registered'))
+                        .catch(error => console.log('SW registration failed:', error));
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
+
